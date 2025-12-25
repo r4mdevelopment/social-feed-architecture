@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional
 
 from engine import SimulationCore
+
 
 # Дефолтные параметры
 
@@ -13,7 +15,7 @@ DEFAULT_PARAMS = {
     "sources": 4,  # Пользователи
     "i32": (0.8, 2.2),  # Интервал генерации
     "lambda": 1.0,  # Интенсивность Exp
-    "steps": 50000,  # Количество шагов по кнопке "N шагов"
+    "steps": 40,  # Количество шагов по кнопке "N шагов"
     "direct": False,  # Прямая постановка
     "seed": 42,  # Сид для воспроизведения тех же результатов в любое время
 }
@@ -24,7 +26,7 @@ DEFAULT_PARAMS = {
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
-        root.title("Симулятор новостной ленты соцсети - Автоматический режим")
+        root.title("Симулятор новостной ленты соцсети — Автоматический режим")
 
         self.params = DEFAULT_PARAMS.copy()
         self.sim: Optional[SimulationCore] = None
@@ -62,28 +64,70 @@ class App:
         self.inputs["steps"].insert(0, str(self.params["steps"]))
 
         self.chk_direct = tk.BooleanVar(value=self.params["direct"])
-        ttk.Checkbutton(params_frame, text="Прямая постановка на прибор",
-                        variable=self.chk_direct).pack(anchor="w", pady=3)
+        ttk.Checkbutton(params_frame, text="Прямая постановка на прибор", variable=self.chk_direct).pack(
+            anchor="w", pady=3
+        )
 
-        # Кнопка запуска
-        ttk.Button(main, text="Запустить автоматический режим",
-                   command=self.run_auto).pack(pady=10)
+        ttk.Button(main, text="Запустить автоматический режим", command=self.run_auto).pack(pady=10)
 
-        # Сводка
-        summary_frame = ttk.LabelFrame(main, text="Сводка результатов")
-        summary_frame.pack(fill="both", expand=True)
+        # Результаты
 
-        cols = ("param", "value")
-        self.summary_table = ttk.Treeview(summary_frame, columns=cols, show="headings", height=12)
+        notebook = ttk.Notebook(main)
+        notebook.pack(fill="both", expand=True)
+
+        summary_frame = ttk.Frame(notebook)
+        notebook.add(summary_frame, text="Сводка")
+
+        self.summary_table = ttk.Treeview(summary_frame, columns=("param", "value"), show="headings", height=10)
         self.summary_table.heading("param", text="Параметр")
         self.summary_table.heading("value", text="Значение")
-
-        self.summary_table.column("param", width=220, anchor="w")
-        self.summary_table.column("value", width=130, anchor="center")
-
+        self.summary_table.column("param", width=260, anchor="w")
+        self.summary_table.column("value", width=160, anchor="center")
         self.summary_table.pack(fill="both", expand=True)
 
-    # Параметры
+        # Таблица 1
+        sources_frame = ttk.Frame(notebook)
+        notebook.add(sources_frame, text="Таблица 1 — Источники")
+
+        cols1 = ("source", "requests", "p_rej", "t_stay", "t_buff", "t_serv", "d_buff", "d_serv")
+        self.tbl_sources = ttk.Treeview(sources_frame, columns=cols1, show="headings", height=12)
+
+        self.tbl_sources.heading("source", text="Источник")
+        self.tbl_sources.heading("requests", text="Заявок")
+        self.tbl_sources.heading("p_rej", text="P отказа")
+        self.tbl_sources.heading("t_stay", text="T в системе")
+        self.tbl_sources.heading("t_buff", text="T буфера")
+        self.tbl_sources.heading("t_serv", text="T обслуживания")
+        self.tbl_sources.heading("d_buff", text="Доля буфера")
+        self.tbl_sources.heading("d_serv", text="Доля обслуж.")
+
+        self.tbl_sources.column("source", width=80, anchor="center")
+        self.tbl_sources.column("requests", width=80, anchor="center")
+        self.tbl_sources.column("p_rej", width=90, anchor="center")
+        self.tbl_sources.column("t_stay", width=95, anchor="center")
+        self.tbl_sources.column("t_buff", width=95, anchor="center")
+        self.tbl_sources.column("t_serv", width=105, anchor="center")
+        self.tbl_sources.column("d_buff", width=95, anchor="center")
+        self.tbl_sources.column("d_serv", width=95, anchor="center")
+
+        self.tbl_sources.pack(fill="both", expand=True)
+
+        # Таблица 2
+        devices_frame = ttk.Frame(notebook)
+        notebook.add(devices_frame, text="Таблица 2 — Приборы")
+
+        cols2 = ("device", "coefficient", "work_time")
+        self.tbl_devices = ttk.Treeview(devices_frame, columns=cols2, show="headings", height=12)
+
+        self.tbl_devices.heading("device", text="Прибор")
+        self.tbl_devices.heading("coefficient", text="Коэфф. загрузки")
+        self.tbl_devices.heading("work_time", text="Рабочее время")
+
+        self.tbl_devices.column("device", width=100, anchor="center")
+        self.tbl_devices.column("coefficient", width=140, anchor="center")
+        self.tbl_devices.column("work_time", width=140, anchor="center")
+
+        self.tbl_devices.pack(fill="both", expand=True)
 
     def read_params(self) -> bool:
         try:
@@ -103,6 +147,8 @@ class App:
 
             lam = float(self.inputs["lambda"].get())
             steps = int(self.inputs["steps"].get())
+            if steps <= 0:
+                raise ValueError("Число шагов должно быть > 0")
 
             self.params = {
                 "buffer": buffer_size,
@@ -115,12 +161,10 @@ class App:
                 "seed": DEFAULT_PARAMS["seed"],
             }
             return True
-
         except Exception as e:
             messagebox.showerror("Ошибка", str(e))
             return False
 
-    # Запуск автоматического режима
 
     def run_auto(self):
         if not self.read_params():
@@ -129,14 +173,16 @@ class App:
         self.sim = SimulationCore(self.params)
         self.sim.bootstrap()
 
-        result = self.sim.run_automatic(
-            max_steps=self.params["steps"],
-            max_time=9999.0,
-        )
+        result = self.sim.run_automatic(max_steps=self.params["steps"], max_time=9999.0)
 
         for row in self.summary_table.get_children():
             self.summary_table.delete(row)
+        for row in self.tbl_sources.get_children():
+            self.tbl_sources.delete(row)
+        for row in self.tbl_devices.get_children():
+            self.tbl_devices.delete(row)
 
+        summary = result["summary"]
         names = {
             "generated": "Сгенерировано заявок",
             "queued": "Поставлено в буфер",
@@ -147,10 +193,43 @@ class App:
             "final_time": "Финальное время",
             "buffer_capacity": "Вместимость буфера",
         }
+        order = ["generated", "queued", "served", "evicted", "direct", "reject_pct", "final_time", "buffer_capacity"]
 
-        for k, v in result.items():
-            rus = names.get(k, k)
-            self.summary_table.insert("", "end", values=(rus, f"{v}"))
+        for k in order:
+            v = summary.get(k, "")
+            if k in ("reject_pct",):
+                self.summary_table.insert("", "end", values=(names[k], f"{float(v):.6f}"))
+            elif k in ("final_time",):
+                self.summary_table.insert("", "end", values=(names[k], f"{float(v):.6f}"))
+            else:
+                self.summary_table.insert("", "end", values=(names[k], f"{v}"))
+
+        for r in result["table_sources"]:
+            self.tbl_sources.insert(
+                "",
+                "end",
+                values=(
+                    r["source"],
+                    r["requests"],
+                    f"{r['p_rej']:.3f}",
+                    f"{r['t_stay']:.2f}",
+                    f"{r['t_buff']:.2f}",
+                    f"{r['t_serv']:.2f}",
+                    f"{r['d_buff']:.2f}",
+                    f"{r['d_serv']:.2f}",
+                ),
+            )
+
+        for r in result["table_devices"]:
+            self.tbl_devices.insert(
+                "",
+                "end",
+                values=(
+                    r["device"],
+                    f"{r['coefficient']:.3f}",
+                    f"{r['work_time']:.2f}",
+                ),
+            )
 
         messagebox.showinfo("Готово", "Автоматическое моделирование завершено!")
 
