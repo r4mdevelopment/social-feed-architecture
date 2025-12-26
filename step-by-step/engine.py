@@ -37,8 +37,8 @@ class ExponentialService(ServiceLaw):
         self.lambd = lambd
 
     def next_service_time(self) -> float:
-        u = random.random()
-        return -math.log(1 - u) / self.lambd if self.lambd > 0 else 0.0
+        r = random.random()
+        return -math.log(r) / self.lambd if self.lambd > 0 else 0.0
 
 
 @dataclass

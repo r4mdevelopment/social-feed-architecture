@@ -40,8 +40,8 @@ class ExponentialService(ServiceLaw):
         self.lambd = lambd
 
     def next_service_time(self) -> float:
-        u = random.random()
-        return -math.log(1 - u) / self.lambd if self.lambd > 0 else 0.0
+        r = random.random()
+        return -math.log(r) / self.lambd if self.lambd > 0 else 0.0
 
 
 
@@ -420,7 +420,7 @@ class SimulationCore:
             buffer_capacity=self.buffer.capacity,
         )
 
-    # ---- Таблица 1: по источникам ----
+    # Таблица 1: по источникам
 
     def table_sources(self) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
@@ -451,7 +451,7 @@ class SimulationCore:
             )
         return rows
 
-    # ---- Таблица 2: по приборам ----
+    # Таблица 2: по приборам
 
     def table_devices(self) -> List[Dict[str, Any]]:
         total_time = self.current_time
