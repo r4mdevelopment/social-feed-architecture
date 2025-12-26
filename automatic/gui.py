@@ -98,8 +98,8 @@ class App:
         self.tbl_sources.heading("t_stay", text="T в системе")
         self.tbl_sources.heading("t_buff", text="T буфера")
         self.tbl_sources.heading("t_serv", text="T обслуживания")
-        self.tbl_sources.heading("d_buff", text="Доля буфера")
-        self.tbl_sources.heading("d_serv", text="Доля обслуж.")
+        self.tbl_sources.heading("d_buff", text="D ожидания в буфере")
+        self.tbl_sources.heading("d_serv", text="D обслуж.")
 
         self.tbl_sources.column("source", width=80, anchor="center")
         self.tbl_sources.column("requests", width=80, anchor="center")

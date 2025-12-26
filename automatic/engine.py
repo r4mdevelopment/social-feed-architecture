@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 import random
 import math
 import heapq
+import statistics
 
 
 @dataclass
@@ -42,7 +43,6 @@ class ExponentialService(ServiceLaw):
     def next_service_time(self) -> float:
         r = random.random()
         return -math.log(r) / self.lambd if self.lambd > 0 else 0.0
-
 
 
 @dataclass
@@ -106,9 +106,6 @@ class Buffer:
         self.slots[newest_idx] = BufferSlot()
         self.size -= 1
         return post
-
-    def list_state(self):
-        return [(i, s.post.id if s.post else None, s.enqueued_at) for i, s in enumerate(self.slots)]
 
 
 class Device:
@@ -193,11 +190,9 @@ class PlacementDispatcher:
                 self._sim.schedule(CompletionEvent(now + dur, dev.id))
                 return AcceptedResult(202, False, assigned_device_id=dev.id)
 
-        evicted_id: Optional[int] = None
         if self._buffer.is_full():
             dropped = self._buffer.drop_oldest_d10o3()
             if dropped is not None:
-                evicted_id = dropped.id
                 self._sim.stats["evicted"] += 1
                 self._sim.source_stats[dropped.source_id]["evicted"] += 1
                 self._sim.log("BUFFER_EVICT", {"post": dropped.id, "source": dropped.source_id})
@@ -207,7 +202,7 @@ class PlacementDispatcher:
             self._sim.stats["queued"] += 1
             self._sim.source_stats[post.source_id]["queued"] += 1
             self._sim.log("BUFFER_ENQUEUE", {"post": post.id, "source": post.source_id})
-        return AcceptedResult(202 if ok else 500, ok, evicted_post_id=evicted_id)
+        return AcceptedResult(202 if ok else 500, ok)
 
 
 class SelectionDispatcher:
@@ -314,9 +309,9 @@ class CompletionEvent(Event):
             st["served"] += 1
 
             if post.service_start is not None:
-                st["t_system"] += max(0.0, post.service_end - post.created_at)
-                st["t_service"] += max(0.0, post.service_end - post.service_start)
-                st["t_buffer"] += max(0.0, post.service_start - post.created_at)
+                st["system_times"].append(post.service_end - post.created_at)
+                st["service_times"].append(post.service_end - post.service_start)
+                st["buffer_times"].append(post.service_start - post.created_at)
 
         sim.log(
             "SERVICE_COMPLETE",
@@ -353,16 +348,16 @@ class SimulationCore:
             direct=0,
         )
 
-        self.source_stats: Dict[int, Dict[str, float]] = {
+        self.source_stats: Dict[int, Dict[str, Any]] = {
             s: dict(
                 generated=0,
                 queued=0,
                 served=0,
                 evicted=0,
                 direct=0,
-                t_system=0.0,
-                t_service=0.0,
-                t_buffer=0.0,
+                system_times=[],
+                buffer_times=[],
+                service_times=[],
             )
             for s in range(1, params["sources"] + 1)
         }
@@ -381,13 +376,6 @@ class SimulationCore:
     def bootstrap(self):
         for s in range(1, self.params["sources"] + 1):
             self.schedule(ArrivalEvent(0.0, s))
-
-    def step(self) -> bool:
-        if not self.calendar:
-            return False
-        ev = heapq.heappop(self.calendar)
-        ev.process(self)
-        return True
 
     def run_automatic(self, max_steps: int = 100000, max_time: float = 9999.0) -> Dict[str, Any]:
         self.log_output.clear()
@@ -420,38 +408,34 @@ class SimulationCore:
             buffer_capacity=self.buffer.capacity,
         )
 
-    # Таблица 1: по источникам
-
     def table_sources(self) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
         for s in range(1, self.params["sources"] + 1):
             st = self.source_stats[s]
             gen = st["generated"]
-            served = st["served"]
 
             p_rej = (st["evicted"] / gen) if gen > 0 else 0.0
-            t_stay = (st["t_system"] / served) if served > 0 else 0.0
-            t_buff = (st["t_buffer"] / served) if served > 0 else 0.0
-            t_serv = (st["t_service"] / served) if served > 0 else 0.0
 
-            d_buff = (st["queued"] / gen) if gen > 0 else 0.0
-            d_serv = (st["served"] / gen) if gen > 0 else 0.0
+            t_sys = statistics.mean(st["system_times"]) if st["system_times"] else 0.0
+            t_buf = statistics.mean(st["buffer_times"]) if st["buffer_times"] else 0.0
+            t_srv = statistics.mean(st["service_times"]) if st["service_times"] else 0.0
+
+            d_buf = statistics.pvariance(st["buffer_times"]) if len(st["buffer_times"]) > 1 else 0.0
+            d_srv = statistics.pvariance(st["service_times"]) if len(st["service_times"]) > 1 else 0.0
 
             rows.append(
                 dict(
                     source=s,
                     requests=int(gen),
                     p_rej=p_rej,
-                    t_stay=t_stay,
-                    t_buff=t_buff,
-                    t_serv=t_serv,
-                    d_buff=d_buff,
-                    d_serv=d_serv,
+                    t_stay=t_sys,
+                    t_buff=t_buf,
+                    t_serv=t_srv,
+                    d_buff=d_buf,
+                    d_serv=d_srv,
                 )
             )
         return rows
-
-    # Таблица 2: по приборам
 
     def table_devices(self) -> List[Dict[str, Any]]:
         total_time = self.current_time
