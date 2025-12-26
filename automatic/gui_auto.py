@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional
 
-from engine import SimulationCore
+from engine_auto import SimulationCore
 
 
 # Дефолтные параметры

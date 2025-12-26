@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from typing import Optional
 
-from engine import SimulationCore
+from engine_step import SimulationCore
 
 # Дефолтные параметры
 
